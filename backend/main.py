@@ -1,38 +1,22 @@
-import pymysql
+from MySQLHelper import MySQLHelper
+from baidu_hot import get_baidu_hot, create_table, save_to_db
 
-class MySQLHelper:
-    def __init__(self, host, user, password, database):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
-        self.conn = None
-        self.cursor = None
+# 百度热搜爬虫测试
+def test_week2():
+    print("\n===== 第二周：百度热搜爬虫 =====")
 
-    def connect(self):
-        """连接数据库"""
-        self.conn = pymysql.connect(
-            host=self.host,
-            user=self.user,
-            password=self.password,
-            database=self.database,
-            charset='utf8mb4'
-        )
-        self.cursor = self.conn.cursor()
+    # 强制重新连接，保证稳定
+    db = MySQLHelper()
+    db.connect()
+    db.close()
 
-    def execute(self, sql, params=None):
-        """执行增删改操作"""
-        try:
-            self.connect()
-            if params:
-                self.cursor.execute(sql, params)
-            else:
-                self.cursor.execute(sql)
-            self.conn.commit()
-            return True
-        except Exception as e:
-            print(f"操作失败: {e}")
-            self.conn.rollback()
-            return False
-        finally:
-            self.close()
+    create_table()    # 创建表
+    data = get_baidu_hot()  # 爬数据
+    save_to_db(data)       # 存数据库
+
+    print("✅ 爬取成功！热搜前 3 条：")
+    for i in range(min(3, len(data))):
+        print(data[i])
+
+if __name__ == "__main__":
+    test_week2()
