@@ -1,48 +1,75 @@
 import requests
-from bs4 import BeautifulSoup
+import time
+import re
+import json
+
 from MySQLHelper import MySQLHelper
 
-# 爬取百度热搜 Top10
-def get_baidu_hot():
-    url = "https://top.baidu.com/board?tab=realtime"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
+# 数据库实例
+db = MySQLHelper()
 
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    hot_list = []
-    items = soup.select(".item-wrap_2oCLZ")
-
-    for i, item in enumerate(items[:10], 1):
-        title = item.select_one(".c-single-text-ellipsis").text.strip()
-        hot = item.select_one(".hot-index_1Bl1a").text.strip()
-        hot_list.append([i, title, hot])
-
-    return hot_list
-
-# 创建数据表
-def create_table():
-    db = MySQLHelper()
+def create_table_baidu_hot():
+    """创建百度热搜数据表，不存在则新建"""
     sql = """
           CREATE TABLE IF NOT EXISTS baidu_hot (
-                                                   id INT PRIMARY KEY AUTO_INCREMENT,
-                                                   rank INT,
-                                                   title VARCHAR(255),
-              hot VARCHAR(50),
-              create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-              ) \
+                                                   id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+                                                   hot_title VARCHAR(512) NOT NULL COMMENT '热搜标题',
+              hot_score VARCHAR(128) COMMENT '热搜热度指数',
+              hot_url VARCHAR(1024) COMMENT '热搜详情链接',
+              create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '爬取时间'
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; \
           """
     db.exec_sql(sql)
-    print("✅ baidu_hot 表创建成功")
-    db.close()
+    print("✅ 百度热搜表校验/创建完成")
 
-# 保存到数据库
-def save_to_db(hot_list):
-    db = MySQLHelper()
-    for item in hot_list:
-        sql = "INSERT INTO baidu_hot (rank, title, hot) VALUES (%s, %s, %s)"
-        db.exec_sql(sql, (item[0], item[1], item[2]))
-    print("✅ 百度热搜数据入库完成")
-    db.close()
+def get_baidu_hot():
+    """爬取百度热搜前10条，返回元组列表[(标题,热度,链接),...]"""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    }
+    url = "https://top.baidu.com/board?tab=realtime"
+    resp = requests.get(url, headers=headers, timeout=10)
+    resp.encoding = "utf-8"
+
+    # 正则提取
+    title_list = re.findall(r'"word":"(.*?)"', resp.text)
+    score_list = re.findall(r'"hotScore":"(.*?)"', resp.text)
+    url_list = re.findall(r'"url":"(.*?)"', resp.text)
+
+    data = []
+    limit = min(10, len(title_list), len(score_list), len(url_list))
+    for i in range(limit):
+        raw_title = title_list[i]
+        # 标准Unicode转义解码，兜底捕获异常防止程序中断
+        try:
+            title = json.loads(f'"{raw_title}"')
+        except json.JSONDecodeError:
+            title = raw_title.encode("utf-8").decode("unicode_escape")
+
+        score = score_list[i]
+        link = url_list[i]
+        data.append((title, score, link))
+
+    print(f"✅ 成功抓取百度热搜前{len(data)}条")
+    return data
+
+def save_to_db(data_list):
+    """批量将热搜数据存入数据库"""
+    if not data_list:
+        print("⚠️ 无热搜数据，跳过入库")
+        return
+    insert_sql = """
+                 INSERT INTO baidu_hot (hot_title, hot_score, hot_url)
+                 VALUES (%s, %s, %s) \
+                 """
+    rows = db.batch_insert(insert_sql, data_list)
+    print(f"✅ 百度热搜入库完成，共插入{rows}条")
+
+# 本地测试入口
+if __name__ == "__main__":
+    create_table_baidu_hot()
+    hot_data = get_baidu_hot()
+    save_to_db(hot_data)
+    print("=== 热搜前3条预览 ===")
+    for item in hot_data[:3]:
+        print(item)

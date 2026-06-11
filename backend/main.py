@@ -1,22 +1,98 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+# 数据库工具
 from MySQLHelper import MySQLHelper
-from baidu_hot import get_baidu_hot, create_table, save_to_db
+# 百度热搜爬虫
+from baidu_hot import get_baidu_hot, create_table_baidu_hot, save_to_db
+# 豆瓣电影爬虫
+from douban_top import get_douban_top100, create_table_douban_movie, save_douban_to_db
 
-# 百度热搜爬虫测试
-def test_week2():
-    print("\n===== 第二周：百度热搜爬虫 =====")
+# 初始化服务
+app = FastAPI(title="爬虫数据可视化后端API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    # 强制重新连接，保证稳定
-    db = MySQLHelper()
-    db.connect()
-    db.close()
+# 全局数据库实例
+db_helper = MySQLHelper(pwd="", db="studentinf")
 
-    create_table()    # 创建表
-    data = get_baidu_hot()  # 爬数据
-    save_to_db(data)       # 存数据库
+# 根页面
+@app.get("/")
+def root():
+    return {
+        "msg": "爬虫可视化API服务运行正常",
+        "接口文档地址": "http://127.0.0.1:8000/docs"
+    }
 
-    print("✅ 爬取成功！热搜前 3 条：")
-    for i in range(min(3, len(data))):
-        print(data[i])
+# ==================== 百度热搜接口 ====================
+@app.get("/api/baidu/hot/crawl")
+def crawl_baidu():
+    """手动触发爬取百度热搜前10并入库"""
+    create_table_baidu_hot()
+    data = get_baidu_hot()
+    save_to_db(data)
+    return {
+        "code": 200,
+        "msg": "百度热搜Top10爬取入库成功",
+        "total": len(data),
+        "sample": data[:3]
+    }
 
+@app.get("/api/baidu/hot/list")
+def get_baidu_list():
+    """查询已存储的热搜数据，前端表格展示"""
+    res = db_helper.query_sql("SELECT * FROM baidu_hot ORDER BY create_time DESC;")
+    return {"code": 200, "data": res}
+
+# ==================== 豆瓣电影接口（Top100可视化） ====================
+@app.get("/api/douban/movie/crawl")
+def crawl_douban():
+    """爬取豆瓣Top100电影入库"""
+    create_table_douban_movie()
+    movie_data = get_douban_top100()
+    save_douban_to_db(movie_data)
+    return {
+        "code": 200,
+        "msg": "豆瓣电影Top100爬取入库成功",
+        "total": len(movie_data)
+    }
+
+@app.get("/api/douban/movie/list")
+def get_douban_list():
+    """查询全部100部电影明细"""
+    sql = "SELECT * FROM douban_movies ORDER BY score DESC LIMIT 100;"
+    data = db_helper.query_sql(sql)
+    return {"code": 200, "data": data}
+
+# 可视化统计接口1：评分分布柱状图
+@app.get("/api/douban/stat/score")
+def score_stat():
+    sql = """
+          SELECT
+              CASE
+                  WHEN score >= 9 THEN '9分及以上'
+                  WHEN score >= 8 THEN '8~9分'
+                  ELSE '7~8分'
+                  END AS score_range,
+              COUNT(*) AS movie_count
+          FROM douban_movies
+          GROUP BY score_range; \
+          """
+    stat = db_helper.query_sql(sql)
+    return {"code": 200, "data": stat}
+
+# 可视化统计接口2：制片国家饼图
+@app.get("/api/douban/stat/country")
+def country_stat():
+    sql = "SELECT country, COUNT(*) AS movie_count FROM douban_movies GROUP BY country;"
+    stat = db_helper.query_sql(sql)
+    return {"code": 200, "data": stat}
+
+# 启动服务
 if __name__ == "__main__":
-    test_week2()
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
