@@ -69,7 +69,6 @@ def get_douban_list():
     data = db_helper.query_sql(sql)
     return {"code": 200, "data": data}
 
-# 可视化统计接口1：评分分布柱状图
 @app.get("/api/douban/stat/score")
 def score_stat():
     sql = """
@@ -81,12 +80,11 @@ def score_stat():
                   END AS score_range,
               COUNT(*) AS movie_count
           FROM douban_movies
-          GROUP BY score_range; \
+          GROUP BY score_range;
           """
     stat = db_helper.query_sql(sql)
     return {"code": 200, "data": stat}
 
-# 可视化统计接口2：制片国家饼图
 @app.get("/api/douban/stat/country")
 def country_stat():
     sql = "SELECT country, COUNT(*) AS movie_count FROM douban_movies GROUP BY country;"
