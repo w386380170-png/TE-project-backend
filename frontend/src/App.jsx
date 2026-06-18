@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Layout, Menu, Card, Spin, Table, Typography, Space } from 'antd';
-import { BarChartOutlined, PieChartOutlined, TableOutlined, FireOutlined } from '@ant-design/icons';
+import { Layout, Menu, Card, Spin, Table, Typography, Space ,Input, Button} from 'antd';
+import { BarChartOutlined, PieChartOutlined, TableOutlined, FireOutlined ,ApiOutlined } from '@ant-design/icons';
 import * as echarts from 'echarts';
 import axios from 'axios';
 import 'antd/dist/reset.css';
@@ -13,6 +13,7 @@ const menuItems = [
   { key: 'country', icon: <PieChartOutlined />, label: '豆瓣地区分布' },
   { key: 'movie', icon: <TableOutlined />, label: '豆瓣电影列表' },
   { key: 'hot', icon: <FireOutlined />, label: '百度热搜Top10' },
+  { key: 'demo', icon: <ApiOutlined />, label: '接口联调' },
 ];
 
 const movieColumns = [
@@ -47,6 +48,39 @@ function App() {
   const [tableData, setTableData] = useState([]);
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+  const [getValue, setGetValue] = useState('');
+  const [bodyValue, setBodyValue] = useState('');
+  const [paramValue, setParamValue] = useState('');
+  const [demoResult, setDemoResult] = useState('');
+  const handleGetDemo = async () => {
+  setLoading(true);
+  try {
+    const response = await axios.get('/api/demo/get-param', {
+      params: { value: getValue },
+    });
+    setDemoResult(JSON.stringify(response.data, null, 2));
+  } catch (error) {
+    setDemoResult('GET 请求失败');
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handlePostDemo = async () => {
+  setLoading(true);
+  try {
+    const response = await axios.post(
+      '/api/demo/post-param',
+      { body: bodyValue },
+      { params: { param: paramValue } }
+    );
+    setDemoResult(JSON.stringify(response.data, null, 2));
+  } catch (error) {
+    setDemoResult('POST 请求失败');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchData = async (key) => {
     setLoading(true);
@@ -68,6 +102,10 @@ function App() {
         case 'hot':
           response = await axios.get('/api/baidu/hot/list');
           setTableData(response.data?.data || []);
+          break;
+        case 'demo':
+          setChartData([]);
+          setTableData([]);
           break;
         default:
           break;
@@ -141,6 +179,38 @@ function App() {
         <div className="content-loading">
           <Spin size="large" />
         </div>
+      );
+    }
+    if (selectedKey === 'demo') {
+  return (
+    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Input
+        placeholder="第一个输入框：GET 参数"
+        value={getValue}
+        onChange={(e) => setGetValue(e.target.value)}
+      />
+      <Button type="primary" onClick={handleGetDemo}>
+        发送 GET 请求
+      </Button>
+
+      <Input
+        placeholder="第二个输入框：POST body"
+        value={bodyValue}
+        onChange={(e) => setBodyValue(e.target.value)}
+      />
+      <Input
+        placeholder="第三个输入框：POST param"
+        value={paramValue}
+        onChange={(e) => setParamValue(e.target.value)}
+      />
+      <Button type="primary" onClick={handlePostDemo}>
+        发送 POST 请求
+      </Button>
+
+      <pre style={{ background: '#f5f5f5', padding: 16, minHeight: 120 }}>
+        {demoResult}
+      </pre>
+    </Space>
       );
     }
 

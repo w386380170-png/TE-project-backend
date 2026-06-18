@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
 # 数据库工具
 from MySQLHelper import MySQLHelper
@@ -17,6 +18,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+class DemoBody(BaseModel):
+    body: str
 
 # 全局数据库实例
 db_helper = MySQLHelper(pwd="", db="studentinf")
@@ -27,6 +30,22 @@ def root():
     return {
         "msg": "爬虫可视化API服务运行正常",
         "接口文档地址": "http://127.0.0.1:8000/docs"
+    }
+
+@app.get("/api/demo/get-param")
+def demo_get_param(value: str = Query("")):
+    return {
+        "code": 200,
+        "msg": f"参数是 {value}"
+    }
+
+
+@app.post("/api/demo/post-param")
+def demo_post_param(data: DemoBody, param: str = Query("")):
+    return {
+        "code": 200,
+        "body_result": f"body中的参数是 {data.body}",
+        "param_result": f"param中的参数是 {param}"
     }
 
 # ==================== 百度热搜接口 ====================
