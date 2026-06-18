@@ -51,6 +51,7 @@ def get_baidu_hot():
     if limit == 0:
         print("⚠未抓取到热搜数据")
         return data
+    #
 
     for i in range(limit):
         raw_title = title_list[i]
