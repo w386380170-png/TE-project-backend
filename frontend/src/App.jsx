@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Layout, Menu, Card, Spin, Table, Typography, Space ,Input, Button} from 'antd';
-import { BarChartOutlined, PieChartOutlined, TableOutlined, FireOutlined ,ApiOutlined } from '@ant-design/icons';
+import { Layout, Menu, Card, Spin, Table, Typography, Space, Input, Button } from 'antd';
+import { BarChartOutlined, PieChartOutlined, TableOutlined, FireOutlined, ApiOutlined } from '@ant-design/icons';
 import * as echarts from 'echarts';
 import axios from 'axios';
 import 'antd/dist/reset.css';
@@ -120,15 +120,21 @@ const handlePostDemo = async () => {
   };
 
   useEffect(() => {
-    if (!chartInstance.current && chartRef.current) {
-      chartInstance.current = echarts.init(chartRef.current);
-      window.addEventListener('resize', () => chartInstance.current?.resize());
-    }
+    const isChartView = selectedKey === 'score' || selectedKey === 'country';
+    if (!isChartView || !chartRef.current) return;
+
+    chartInstance.current?.dispose();
+    chartInstance.current = echarts.init(chartRef.current);
+
+    const handleResize = () => chartInstance.current?.resize();
+    window.addEventListener('resize', handleResize);
+
     return () => {
-      window.removeEventListener('resize', () => chartInstance.current?.resize());
+      window.removeEventListener('resize', handleResize);
       chartInstance.current?.dispose();
+      chartInstance.current = null;
     };
-  }, []);
+  }, [selectedKey]);
 
   useEffect(() => {
     fetchData(selectedKey);
@@ -174,7 +180,8 @@ const handlePostDemo = async () => {
   }, [selectedKey, chartData]);
 
   const renderContent = () => {
-    if (loading) {
+    const isChartView = selectedKey === 'score' || selectedKey === 'country';
+    if (loading && !isChartView) {
       return (
         <div className="content-loading">
           <Spin size="large" />
@@ -222,7 +229,11 @@ const handlePostDemo = async () => {
       return <Table rowKey="id" columns={hotColumns} dataSource={tableData} pagination={false} />;
     }
 
-    return <div ref={chartRef} className="chart-box" />;
+    return (
+      <Spin spinning={loading}>
+        <div ref={chartRef} className="chart-box" />
+      </Spin>
+    );
   };
 
   return (

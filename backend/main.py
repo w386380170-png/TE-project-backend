@@ -2,6 +2,7 @@ from fastapi import FastAPI,Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+from auth import router as auth_router
 # 数据库工具
 from MySQLHelper import MySQLHelper
 # 百度热搜爬虫
@@ -11,6 +12,7 @@ from douban_top import get_douban_top100, create_table_douban_movie, save_douban
 
 # 初始化服务
 app = FastAPI(title="爬虫数据可视化后端API")
+app.include_router(auth_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
