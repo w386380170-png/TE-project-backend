@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Layout, Menu, Card, Spin, Table, Typography, Space, Input, Button } from 'antd';
-import { BarChartOutlined, PieChartOutlined, TableOutlined, FireOutlined, ApiOutlined } from '@ant-design/icons';
+import {
+  ApiOutlined,
+  BarChartOutlined,
+  FireOutlined,
+  PieChartOutlined,
+  TableOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import * as echarts from 'echarts';
 import axios from 'axios';
 import 'antd/dist/reset.css';
@@ -9,6 +16,7 @@ const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
 
 const menuItems = [
+  { key: 'auth', icon: <UserOutlined />, label: '登录注册' },
   { key: 'score', icon: <BarChartOutlined />, label: '豆瓣评分分布' },
   { key: 'country', icon: <PieChartOutlined />, label: '豆瓣地区分布' },
   { key: 'movie', icon: <TableOutlined />, label: '豆瓣电影列表' },
@@ -46,41 +54,75 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState([]);
   const [tableData, setTableData] = useState([]);
-  const chartRef = useRef(null);
-  const chartInstance = useRef(null);
   const [getValue, setGetValue] = useState('');
   const [bodyValue, setBodyValue] = useState('');
   const [paramValue, setParamValue] = useState('');
   const [demoResult, setDemoResult] = useState('');
-  const handleGetDemo = async () => {
-  setLoading(true);
-  try {
-    const response = await axios.get('/api/demo/get-param', {
-      params: { value: getValue },
-    });
-    setDemoResult(JSON.stringify(response.data, null, 2));
-  } catch (error) {
-    setDemoResult('GET 请求失败');
-  } finally {
-    setLoading(false);
-  }
-};
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [authResult, setAuthResult] = useState('');
+  const chartRef = useRef(null);
+  const chartInstance = useRef(null);
 
-const handlePostDemo = async () => {
-  setLoading(true);
-  try {
-    const response = await axios.post(
-      '/api/demo/post-param',
-      { body: bodyValue },
-      { params: { param: paramValue } }
-    );
-    setDemoResult(JSON.stringify(response.data, null, 2));
-  } catch (error) {
-    setDemoResult('POST 请求失败');
-  } finally {
-    setLoading(false);
-  }
-};
+  const handleGetDemo = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get('/api/demo/get-param', {
+        params: { value: getValue },
+      });
+      setDemoResult(JSON.stringify(response.data, null, 2));
+    } catch (error) {
+      setDemoResult('GET 请求失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePostDemo = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        '/api/demo/post-param',
+        { body: bodyValue },
+        { params: { param: paramValue } }
+      );
+      setDemoResult(JSON.stringify(response.data, null, 2));
+    } catch (error) {
+      setDemoResult('POST 请求失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post('/api/auth/register', {
+        username,
+        password,
+      });
+      setAuthResult(JSON.stringify(response.data, null, 2));
+    } catch (error) {
+      setAuthResult('注册请求失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post('/api/auth/login', {
+        username,
+        password,
+      });
+      setAuthResult(JSON.stringify(response.data, null, 2));
+    } catch (error) {
+      setAuthResult('登录请求失败');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchData = async (key) => {
     setLoading(true);
@@ -90,19 +132,24 @@ const handlePostDemo = async () => {
         case 'score':
           response = await axios.get('/api/douban/stat/score');
           setChartData(response.data?.data || []);
+          setTableData([]);
           break;
         case 'country':
           response = await axios.get('/api/douban/stat/country');
           setChartData(response.data?.data || []);
+          setTableData([]);
           break;
         case 'movie':
           response = await axios.get('/api/douban/movie/list');
           setTableData(response.data?.data || []);
+          setChartData([]);
           break;
         case 'hot':
           response = await axios.get('/api/baidu/hot/list');
           setTableData(response.data?.data || []);
+          setChartData([]);
           break;
+        case 'auth':
         case 'demo':
           setChartData([]);
           setTableData([]);
@@ -142,6 +189,7 @@ const handlePostDemo = async () => {
 
   useEffect(() => {
     if (!chartInstance.current) return;
+
     if (selectedKey === 'score') {
       const xData = chartData.map((item) => item.score_range);
       const yData = chartData.map((item) => item.movie_count);
@@ -159,7 +207,10 @@ const handlePostDemo = async () => {
         ],
       });
     } else if (selectedKey === 'country') {
-      const pieData = chartData.map((item) => ({ name: item.country || '未知', value: item.movie_count }));
+      const pieData = chartData.map((item) => ({
+        name: item.country || '未知',
+        value: item.movie_count,
+      }));
       chartInstance.current.setOption({
         title: { text: '豆瓣电影国家/地区分布' },
         tooltip: { trigger: 'item' },
@@ -171,7 +222,7 @@ const handlePostDemo = async () => {
             avoidLabelOverlap: false,
             itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
             label: { show: false },
-            emphasis: { label: { show: true, fontSize: '16', fontWeight: 'bold' } },
+            emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
             data: pieData,
           },
         ],
@@ -179,17 +230,7 @@ const handlePostDemo = async () => {
     }
   }, [selectedKey, chartData]);
 
-  const renderContent = () => {
-    const isChartView = selectedKey === 'score' || selectedKey === 'country';
-    if (loading && !isChartView) {
-      return (
-        <div className="content-loading">
-          <Spin size="large" />
-        </div>
-      );
-    }
-    if (selectedKey === 'demo') {
-  return (
+  const renderDemo = () => (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Input
         placeholder="第一个输入框：GET 参数"
@@ -218,13 +259,49 @@ const handlePostDemo = async () => {
         {demoResult}
       </pre>
     </Space>
+  );
+
+  const renderAuth = () => (
+    <Space direction="vertical" size="middle" style={{ width: '100%', maxWidth: 420 }}>
+      <Input
+        placeholder="用户名"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+      />
+      <Input.Password
+        placeholder="密码"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <Space>
+        <Button type="primary" onClick={handleRegister}>
+          注册
+        </Button>
+        <Button onClick={handleLogin}>
+          登录
+        </Button>
+      </Space>
+      <pre style={{ background: '#f5f5f5', padding: 16, minHeight: 120, width: '100%' }}>
+        {authResult}
+      </pre>
+    </Space>
+  );
+
+  const renderContent = () => {
+    const isChartView = selectedKey === 'score' || selectedKey === 'country';
+    if (loading && !isChartView) {
+      return (
+        <div className="content-loading">
+          <Spin size="large" />
+        </div>
       );
     }
 
+    if (selectedKey === 'demo') return renderDemo();
+    if (selectedKey === 'auth') return renderAuth();
     if (selectedKey === 'movie') {
       return <Table rowKey="id" columns={movieColumns} dataSource={tableData} pagination={{ pageSize: 10 }} />;
     }
-
     if (selectedKey === 'hot') {
       return <Table rowKey="id" columns={hotColumns} dataSource={tableData} pagination={false} />;
     }
@@ -257,7 +334,9 @@ const handlePostDemo = async () => {
         <Content className="content-container">
           <Card style={{ minHeight: 520 }}>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <Text type="secondary">当前视图：{menuItems.find((item) => item.key === selectedKey)?.label}</Text>
+              <Text type="secondary">
+                当前视图：{menuItems.find((item) => item.key === selectedKey)?.label}
+              </Text>
               {renderContent()}
             </Space>
           </Card>
